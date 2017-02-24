@@ -6,7 +6,7 @@ import (
 	. "github.com/onsi/gomega/gexec"
 )
 
-var _ = FDescribe("Race condition tests", func() {
+var _ = Describe("Race condition tests", func() {
 	Describe("when creating a new secret in multiple threads with `--no-overwrite`", func() {
 		It("should return the same value for both", func() {
 			rsaSecretName := generateUniqueCredentialName()
