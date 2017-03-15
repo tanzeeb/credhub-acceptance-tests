@@ -66,6 +66,7 @@ var _ = Describe("mutual TLS authentication", func() {
 				"expired.pem",
 				"expired_key.pem")
 
+			fmt.Printf("result: %#v\n", result)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("unknown certificate"))
 			Expect(result).To(BeEmpty())
@@ -177,7 +178,6 @@ func generateCertificate() {
 	block, _ = pem.Decode([]byte(clientCaKeyPem))
 
 	clientCaKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	fmt.Printf("client ca cert: %#v\n", clientCaKey)
 	Expect(err).NotTo(HaveOccurred())
 
 	certTemplate := &x509.Certificate{
@@ -188,11 +188,9 @@ func generateCertificate() {
 		NotBefore:    time.Now(),
 		NotAfter:     time.Now().AddDate(10, 0, 0),
 		SubjectKeyId: []byte{1, 2, 3, 4, 6},
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 	}
 	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
-	pub := priv.PublicKey
+	pub := &priv.PublicKey
 	cert, err := x509.CreateCertificate(
 		rand.Reader,
 		certTemplate,

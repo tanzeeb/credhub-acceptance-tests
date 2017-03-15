@@ -56,6 +56,14 @@ def generate_untrusted_cert(cert_dir)
   create_pem_files(cert, key, cert_dir, "invalid")
 end
 
+def generate_expired_cert(ca_cert_path, ca_key_path, cert_dir)
+  day = 24 * 60 * 60
+  now = Time.now
+  cert, key = generate_self_signed_cert(now - 2* day, now - 2)
+  create_pem_files(cert, key, cert_dir, "expired")
+end
+
+
 if ARGV.size != 2
   puts "Usage: generate_certs.rb <PATH_TO_CA_CERTIFICATE> <PATH_TO_CA_PRIVATE_KEY>"
   exit
@@ -68,5 +76,6 @@ setup_cert_dir(cert_dir)
 
 generate_valid_cert(ca_cert_path, ca_key_path, cert_dir)
 generate_untrusted_cert(cert_dir)
-generate_not_yet_valid_cert(ca_cert_path, ca_key_path, cert_dir)
+generate_expired_cert(ca_cert_path, ca_key_path, cert_dir)
+# generate_not_yet_valid_cert(ca_cert_path, ca_key_path, cert_dir)
 
