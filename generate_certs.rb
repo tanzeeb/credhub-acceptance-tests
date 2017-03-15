@@ -68,4 +68,5 @@ setup_cert_dir(cert_dir)
 
 generate_valid_cert(ca_cert_path, ca_key_path, cert_dir)
 generate_untrusted_cert(cert_dir)
+generate_not_yet_valid_cert(ca_cert_path, ca_key_path, cert_dir)
 
