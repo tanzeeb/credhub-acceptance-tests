@@ -2,15 +2,21 @@ package api_integration_test
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
 	"path"
 	"testing"
+	"time"
 
 	. "github.com/cloudfoundry-incubator/credhub-acceptance-tests/test_helpers"
 	. "github.com/onsi/ginkgo"
@@ -31,10 +37,8 @@ var _ = Describe("mutual TLS authentication", func() {
 		})
 
 		It("allows the client to hit an authenticated endpoint", func() {
-			postData := map[string]string{
-				"name": "mtlstest",
-				"type": "password",
-			}
+			generateCertificate()
+			postData := `{"name":"mtlstest","type":"password"}`
 			result, err := mtlsPost(
 				config.ApiUrl+"/api/v1/data",
 				postData,
@@ -54,10 +58,7 @@ var _ = Describe("mutual TLS authentication", func() {
 		})
 
 		It("prevents the client from hitting an authenticated endpoint", func() {
-			postData := map[string]string{
-				"name": "mtlstest",
-				"type": "password",
-			}
+			postData := `{"name":"mtlstest","type":"password"}`
 			result, err := mtlsPost(
 				config.ApiUrl+"/api/v1/data",
 				postData,
@@ -66,6 +67,7 @@ var _ = Describe("mutual TLS authentication", func() {
 				"expired_key.pem")
 
 			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(ContainSubstring("unknown certificate"))
 			Expect(result).To(BeEmpty())
 		})
 	})
@@ -77,10 +79,7 @@ var _ = Describe("mutual TLS authentication", func() {
 		})
 
 		It("prevents the client from hitting an authenticated endpoint", func() {
-			postData := map[string]string{
-				"name": "mtlstest",
-				"type": "password",
-			}
+			postData := `{"name":"mtlstest","type":"password"}`
 			result, err := mtlsPost(
 				config.ApiUrl+"/api/v1/data",
 				postData,
@@ -109,12 +108,10 @@ func handleError(err error) {
 	}
 }
 
-func mtlsPost(url string, postData map[string]string, serverCaFilename, clientCertFilename, clientKeyPath string) (string, error) {
+func mtlsPost(url string, postData string, serverCaFilename, clientCertFilename, clientKeyPath string) (string, error) {
 	client, err := createMtlsClient(serverCaFilename, clientCertFilename, clientKeyPath)
 
-	jsonValue, _ := json.Marshal(postData)
-
-	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonValue))
+	resp, err := client.Post(url, "application/json", bytes.NewBuffer([]byte(postData)))
 	if err != nil {
 		return "", err
 	}
@@ -160,4 +157,49 @@ func createMtlsClient(serverCaFilename, clientCertFilename, clientKeyFilename st
 	client := &http.Client{Transport: transport}
 
 	return client, err
+}
+
+func generateCertificate() {
+	clientCaCertPath := path.Join(config.CredentialRoot, "client_ca_cert.pem")
+	clientCaPrivatePath := path.Join(config.CredentialRoot, "client_ca_private.pem")
+
+	clientCaCertPem, err := ioutil.ReadFile(clientCaCertPath)
+	Expect(err).NotTo(HaveOccurred())
+
+	block, _ := pem.Decode([]byte(clientCaCertPem))
+
+	clientCaCert, err := x509.ParseCertificate(block.Bytes)
+	Expect(err).NotTo(HaveOccurred())
+
+	clientCaKeyPem, err := ioutil.ReadFile(clientCaPrivatePath)
+	Expect(err).NotTo(HaveOccurred())
+
+	block, _ = pem.Decode([]byte(clientCaKeyPem))
+
+	clientCaKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	fmt.Printf("client ca cert: %#v\n", clientCaKey)
+	Expect(err).NotTo(HaveOccurred())
+
+	certTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(1658),
+		Subject: pkix.Name{
+			CommonName: "credhub_test_client",
+		},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().AddDate(10, 0, 0),
+		SubjectKeyId: []byte{1, 2, 3, 4, 6},
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+	}
+	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
+	pub := priv.PublicKey
+	cert, err := x509.CreateCertificate(
+		rand.Reader,
+		certTemplate,
+		clientCaCert,
+		pub,
+		clientCaKey)
+	Expect(err).NotTo(HaveOccurred())
+
+	fmt.Printf("client ca cert: %#v\n", cert)
 }
