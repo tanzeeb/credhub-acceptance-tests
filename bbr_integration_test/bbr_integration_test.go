@@ -47,14 +47,36 @@ var _ = Describe("Backup and Restore", func() {
 
 	It("Successfully backs up and restores a Credhub release", func() {
 		var session *Session
+		var bbrArgs []string
+
+		if config.Bosh.Deployment == "" {
+			// director case
+			bbrArgs = []string{
+				"bbr",
+				"director",
+				"--host", config.Bosh.Host,
+				"--username", config.Bosh.SshUsername,
+				"--private-key-path", config.Bosh.SshPrivateKeyPath,
+			}
+		} else {
+			// deployment case mysql
+			bbrArgs = []string{
+				"bbr",
+				"deployment",
+				"--target", config.Bosh.Host,
+				"--username", config.Bosh.DirectorUsername,
+				"--password", config.Bosh.DirectorPassword,
+				"--deployment", config.Bosh.Deployment,
+			}
+		}
 
 		By("adding a test credential")
 		session = RunCommand("credhub", "set", "--name", credentialName, "--type", "password", "-w", "originalsecret")
 		Eventually(session).Should(Exit(0))
 
 		By("running bbr backup")
-		session = RunCommand("bbr", "director", "--private-key-path", config.Bosh.SshPrivateKeyPath,
-			"--username", config.Bosh.SshUsername, "--host", config.Bosh.Host, "backup")
+		backupArgs := append(bbrArgs, "backup")
+		session = RunCommand(backupArgs...)
 		Eventually(session).Should(Exit(0))
 
 		By("asserting that the backup archive exists and contains a pg dump file")
@@ -71,9 +93,8 @@ var _ = Describe("Backup and Restore", func() {
 		Eventually(session.Out).Should(Say("value: updatedsecret"))
 
 		By("running bbr restore")
-		restoreCommand := fmt.Sprintf("bbr director --private-key-path %s --username %s --host %s restore --artifact-path ./%s*Z/",
-			config.Bosh.SshPrivateKeyPath, config.Bosh.SshUsername, config.Bosh.Host, config.DirectorHost)
-		session = RunCommand("sh", "-c", restoreCommand)
+		restoreArgs := append(bbrArgs, "restore", "--artifact-path", "./%s*Z/")
+		session = RunCommand("sh", "-c", strings.Join(restoreArgs, " "))
 		Eventually(session).Should(Exit(0))
 
 		By("checking if the test credentials was restored")

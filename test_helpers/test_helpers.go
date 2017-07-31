@@ -36,6 +36,9 @@ type BoshConfig struct {
 	Host              string `json:"host"`
 	SshUsername       string `json:"bosh_ssh_username"`
 	SshPrivateKeyPath string `json:"bosh_ssh_private_key_path"`
+	DirectorUsername  string `json:"director_username"`
+	DirectorPassword  string `json:"director_password"`
+	Deployment        string `json:"deployment"`
 }
 
 type Config struct {
