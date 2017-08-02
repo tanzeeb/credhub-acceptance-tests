@@ -42,7 +42,7 @@ var _ = Describe("Backup and Restore", func() {
 
 	AfterEach(func() {
 		CleanupCredhub(bbrTestPath)
-		CleanupArtifacts()
+		//CleanupArtifacts()
 	})
 
 	It("Successfully backs up and restores a Credhub release", func() {
@@ -67,6 +67,8 @@ var _ = Describe("Backup and Restore", func() {
 				"--username", config.Bosh.DirectorUsername,
 				"--password", config.Bosh.DirectorPassword,
 				"--deployment", config.Bosh.Deployment,
+				"--ca-cert", config.UAACa,
+				"--debug",
 			}
 		}
 
@@ -93,7 +95,7 @@ var _ = Describe("Backup and Restore", func() {
 		Eventually(session.Out).Should(Say("value: updatedsecret"))
 
 		By("running bbr restore")
-		restoreArgs := append(bbrArgs, "restore", "--artifact-path", "./%s*Z/")
+		restoreArgs := append(bbrArgs, "restore", "--artifact-path", fmt.Sprintf("./%s*Z/", config.DirectorHost))
 		session = RunCommand("sh", "-c", strings.Join(restoreArgs, " "))
 		Eventually(session).Should(Exit(0))
 
